@@ -1,65 +1,262 @@
-# PINN_Multi_Exp
+PINN_Multi_Exp: Inverse Solver for Coupled Reaction Kinetics
+PINN_Multi_Exp 是一個專為解決複雜化學反應動力學反問題而設計的物理資訊神經網路 (Physics-Informed Neural Network) 框架。
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
-![PyTorch](https://img.shields.io/badge/PyTorch-Stable-red)
-![Status](https://img.shields.io/badge/Status-Active-success)
+本專案針對鎂合金（AZ61）儲氫材料的吸放氫反應，利用 PINN 結合自動微分技術，同時對多組實驗數據進行擬合，並反推耦合反應中的關鍵動力學參數 (k 
+1
+​
+ …k 
+4
+​
+ ) 與材料常數 (A 
+0
+​
+ …E 
+0
+​
+ )。
 
-**PINN_Multi_Exp** 是一個基於物理資訊神經網路 (Physics-Informed Neural Networks, PINNs) 的深度學習框架，專為解決 **多重實驗配置下的反問題 (Inverse Problems)** 而設計。
+📐 數學模型架構 (Mathematical Modeling)
+本研究建立了一個包含兩個中間產物相 (R 與 R 
+2
+​
+ ) 的耦合常微分方程組 (Coupled ODEs)。模型考慮了反應物濃度 H 與產物之間的化學計量平衡。
 
-本專案旨在透過 PINN 同時對多組實驗數據進行擬合，並利用自動微分技術精確反推物理模型中的未知參數（如反應速率常數、擴散係數等）。
+1. 狀態變數與守恆 (State Variables & Conservation)
+我們定義 H 為氣相濃度（如氫氣），其受到兩個固相產物 R 與 R 
+2
+​
+  的生成所消耗。根據質量守恆與化學計量比（Stoichiometry）：
 
-## 📂 檔案結構 (File Structure)
+H(t)=B 
+init
+​
+ −R(t)−9R 
+2
+​
+ (t)
+其中 B 
+init
+​
+  為初始濃度，R 與 R 
+2
+​
+  分別代表不同反應階段的生成物。
 
-```plaintext
-PINN_Multi_Exp/
-├── inverse_multi_exp.py  # 核心程式：執行 PINN 訓練與參數反推
-├── dataset/              # 實驗數據存放區
-├── conf/                 # 設定檔 (模型參數、超參數配置)
-├── Exp_0_fit.png         # 實驗 0 擬合結果圖
-├── Exp_1_fit.png         # 實驗 1 擬合結果圖
-└── README.md             # 專案說明文件
+2. 控制方程式 (Governing Equations)
+反應速率由以下非線性 ODE 系統描述，這正是 PINN 損失函數中的 Physics Loss 核心：
 
-## 📐 物理模型架構 (Physics Model Architecture)
+第一階段反應 (R phase):
 
-本專案利用 PINN 求解控制化學反應速率的常微分方程式 (ODE)。模型的核心目標是根據實驗數據，反推不同溫度/壓力下的反應速率常數與動力學機制。
+dt
+dR
+​
+ =k 
+1
+​
+ (A 
+0
+​
+ −R)H−k 
+2
+​
+ (C 
+0
+​
+ +R+9R 
+2
+​
+ )
+第二階段反應 (R 
+2
+​
+  phase):
 
-### 1. 控制方程式 (Governing Equation)
-
-我們考慮固態反應動力學的一般形式：
-
-$$
-\frac{d\alpha}{dt} = k(T) \cdot f(\alpha)
-$$
-
+dt
+dR 
+2
+​
+ 
+​
+ =k 
+3
+​
+ (D 
+0
+​
+ −R 
+2
+​
+ )H 
+9
+ −k 
+4
+​
+ (C 
+0
+​
+ +R+9R 
+2
+​
+ ) 
+9
+ (E 
+0
+​
+ +4R 
+2
+​
+ ) 
+4
+ 
 其中：
-* $\alpha$：反應轉化率 (Conversion fraction, $0 \le \alpha \le 1$)。
-* $t$：時間 (Time)。
-* $k(T)$：反應速率常數 (Rate constant)，通常隨溫度 $T$ 變化。
-* $f(\alpha)$：反應機理函數 (Reaction model function)，例如 JMAK 模型、收縮體積模型等。
 
-### 2. 神經網路架構 (Network Architecture)
+k 
+1
+​
+ ,k 
+3
+​
+ ：正向反應速率常數 (Forward rate constants)。
 
-我們建構一個全連接神經網路 (FCNN) 來逼近解 $u(t) \approx \alpha(t)$：
-* **Input**: 時間 $t$ (以及可選的溫度 $T$ 或壓力 $P$)。
-* **Output**: 預測的轉化率 $\hat{\alpha}(t)$。
-* **Parameters**: 網路權重 $W, b$ 以及待反演的物理參數 (如 $k$)。
+k 
+2
+​
+ ,k 
+4
+​
+ ：逆向反應速率常數 (Backward rate constants)。
 
-### 3. 損失函數設計 (Loss Function)
+A 
+0
+​
+ ,C 
+0
+​
+ ,D 
+0
+​
+ ,E 
+0
+​
+ ：與材料容量及活性相關的待定參數。
 
-為了訓練模型並同時求解反問題，我們定義總損失函數為：
+🧠 神經網路架構 (Network Architecture)
+為了實現多實驗參數共享與精確求解，本框架採用了特殊的網路設計：
 
-$$
-\mathcal{L}_{total} = \mathcal{L}_{data} + \lambda \mathcal{L}_{physics}
-$$
+條件輸入 (Conditional Input): 網路輸入包含時間 t 與實驗編號 (Condition ID, cid)：
 
-* **數據誤差 (Data Loss)**：
-    確保網路預測值符合實驗觀測數據。
-    $$
-    \mathcal{L}_{data} = \frac{1}{N_{data}} \sum_{i=1}^{N_{data}} \left( \hat{\alpha}(t_i) - \alpha_{exp}^{(i)} \right)^2
-    $$
+Net(t,cid)→[ 
+R
+^
+ , 
+R
+^
+  
+2
+​
+ ]
+這使得單一網路能同時學習不同實驗條件下的動力學曲線。
 
-* **物理殘差 (Physics/Residual Loss)**：
-    利用自動微分 (Automatic Differentiation) 計算 $\frac{d\hat{\alpha}}{dt}$，強迫網路輸出滿足上述 ODE。
-    $$
-    \mathcal{L}_{physics} = \frac{1}{N_{phys}} \sum_{j=1}^{N_{phys}} \left( \frac{d\hat{\alpha}}{dt}\bigg|_{t_j} - k \cdot f(\hat{\alpha}(t_j)) \right)^2
-    $$
+硬約束初始條件 (Hard Initial Condition Enforcement): 為了保證 t=0 時產物濃度為零，我們不透過 Loss 懲罰，而是直接在架構上強制滿足：
+
+R(t)=t⋅σ(Net 
+1
+​
+ (t))⋅B 
+init
+​
+ 
+R 
+2
+​
+ (t)=t⋅σ(Net 
+2
+​
+ (t))⋅D 
+0
+​
+ 
+此方法顯著提升了訓練初期的收斂穩定性。
+
+參數共享機制 (Parameter Sharing): 反應速率常數 k 
+i
+​
+  與材料常數 A 
+0
+​
+ …E 
+0
+​
+  被設計為可訓練的全局變數 (Learnable Variables)，在所有實驗數據間共享，確保物理參數的一致性。
+
+🚀 核心演算法 (Algorithm)
+程式碼 inverse_multi_exp.py 的執行流程如下：
+
+Data Loading: 讀取 AZ61_3Pd 系列實驗數據，進行時間與濃度的正規化 (Normalization)。
+
+PINN Training:
+
+最小化數據誤差：L 
+data
+​
+ =∣∣H 
+pred
+​
+ −H 
+meas
+​
+ ∣∣ 
+2
+ 
+
+最小化物理殘差：L 
+physics
+​
+ =∣∣ 
+dt
+dR
+​
+ −f 
+1
+​
+ (…)∣∣ 
+2
+ +∣∣ 
+dt
+dR 
+2
+​
+ 
+​
+ −f 
+2
+​
+ (…)∣∣ 
+2
+ 
+
+Verification: 使用 Runge-Kutta 4 (RK4) 數值方法，代入 PINN 反推的參數進行正向模擬，驗證反演結果的準確性。
+
+📂 檔案結構
+Plaintext
+
+PINN_Multi_Exp/
+├── inverse_multi_exp.py    # [Core] PINN solver & Physics definition
+├── dataset/                # Experimental CSV data (AZ61_3Pd...)
+├── conf/                   # Configuration via Hydra
+├── artifacts/              # Output folder
+│   ├── Exp_0_fit.png       # Visualization for Experiment 1
+│   ├── Exp_1_fit.png       # Visualization for Experiment 2
+│   └── Exp_0_pred.csv      # Numerical results
+└── README.md
+📊 結果與引用
+本框架成功在稀疏且帶有雜訊的實驗數據下，反推得到符合熱力學限制的反應速率常數，並準確重構了實驗曲線。
+
+程式碼片段
+
+@misc{PINN_Multi_Exp,
+  author = {Wen Xiang Zheng},
+  title = {Physics-Informed Deep Learning for Inverse Chemical Kinetics},
+  year = {2025},
+  note = {Applicable to Mg-based hydrogen storage materials}
+}
