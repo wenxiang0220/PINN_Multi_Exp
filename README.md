@@ -18,3 +18,9 @@ PINN_Multi_Exp/
 ├── Exp_0_fit.png         # 實驗 0 擬合結果圖
 ├── Exp_1_fit.png         # 實驗 1 擬合結果圖
 └── README.md             # 專案說明文件
+🚀 功能特點 (Key Features)
+多實驗並行處理 (Multi-Experiment Support) 支援同時讀取多組不同實驗條件（如不同溫度、壓力）的數據，並進行批次訓練。
+
+反問題求解 (Inverse Modeling) 利用 PINN 的 Residual Loss 機制，將物理定律（ODE/PDE）嵌入損失函數中，從數據中反推未知的物理參數。
+
+自動化視覺化 (Automatic Visualization) 訓練過程中自動生成擬合曲線與誤差分析圖（如 Exp_0_fit.png），即時監控模型表現。
