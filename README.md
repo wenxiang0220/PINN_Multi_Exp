@@ -55,7 +55,7 @@ $$
     這使得單一網路能同時學習不同實驗條件下的動力學曲線。
 
 2.  **硬約束初始條件 (Hard Initial Condition Enforcement)**:
-    為了保證 $t=0$ 時產物濃度為零，我們不透過 Loss 懲罰，而是直接在架構上強制滿足：
+    為了保證 $ t=0 $ 時產物濃度為零，我們不透過 Loss 懲罰，而是直接在架構上強制滿足：
     $$
     R(t) = t \cdot \sigma(\text{Net}_1(t)) \cdot B_{init}
     $$
@@ -65,7 +65,7 @@ $$
     此方法顯著提升了訓練初期的收斂穩定性。
 
 3.  **參數共享機制 (Parameter Sharing)**:
-    反應速率常數 $k_i$ 與材料常數 $A_0 \dots E_0$ 被設計為可訓練的全局變數 (Learnable Variables)，在所有實驗數據間共享，確保物理參數的一致性。
+    反應速率常數 $ k_i $ 與材料常數 $ A_0 \dots E_0 $ 被設計為可訓練的全局變數 (Learnable Variables)，在所有實驗數據間共享，確保物理參數的一致性。
 
 ## 🚀 核心演算法 (Algorithm)
 
@@ -73,8 +73,8 @@ $$
 
 1.  **Data Loading**: 讀取 `AZ61_3Pd` 系列實驗數據，進行時間與濃度的正規化 (Normalization)。
 2.  **PINN Training**:
-    * 最小化數據誤差：$\mathcal{L}_{data} = ||H_{pred} - H_{meas}||^2$
-    * 最小化物理殘差：$\mathcal{L}_{physics} = ||\frac{dR}{dt} - f_1(\dots)||^2 + ||\frac{dR_2}{dt} - f_2(\dots)||^2$
+    * 最小化數據誤差：$ \mathcal{L}_{data} = ||H_{pred} - H_{meas}||^2 $
+    * 最小化物理殘差：$ \mathcal{L}_{physics} = ||\frac{dR}{dt} - f_1(\dots)||^2 + ||\frac{dR_2}{dt} - f_2(\dots)||^2 $
 3.  **Verification**: 使用 Runge-Kutta 4 (RK4) 數值方法，代入 PINN 反推的參數進行正向模擬，驗證反演結果的準確性。
 
 ## 📂 檔案結構
